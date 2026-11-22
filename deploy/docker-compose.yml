@@ -1,0 +1,83 @@
+# AI gateway on one VM: Caddy (public, 80/443) in front of the gateway.
+#
+# Exposure is controlled HERE, not by a host firewall (Docker-published ports
+# bypass ufw):
+#   - caddy publishes 80 and 443, nothing else
+#   - gateway publishes only 127.0.0.1:3002 (admin), reached through
+#     `tailscale serve --bg --https=8443 http://127.0.0.1:3002`
+#   - gateway port 3001 (public role) is NOT published; only caddy reaches it
+#     over the compose network
+#
+# Lives at /srv/gateway/ on the VM next to .env, gateway.config.json and data/.
+# See deploy/README.md.
+name: ai-gateway
+
+services:
+  gateway:
+    image: ${GATEWAY_IMAGE:-ghcr.io/smokenova/ai-gateway:latest}
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3001"
+      GATEWAY_SERVER_MODE: "1"
+      GATEWAY_ADMIN_PORT: "3002"
+      GATEWAY_CONFIG_PATH: /app/gateway.config.json
+      # Exactly one proxy (caddy) in front; "true" would trust spoofed headers.
+      TRUST_PROXY: "1"
+      FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS: "true"
+      # Per-app limits are the real control; app servers share egress IPs.
+      PROXY_RATE_LIMIT_RPM: "600"
+      FALLBACK_TIME_BUDGET_MS: "55000"
+      HEALTH_CHECK_INTERVAL_MS: "900000"
+      FREEAPI_DB_BACKUP_PATH: /app/server/data/backups/freeapi.db.enc
+      FREEAPI_DB_BACKUP_INTERVAL_MS: "21600000"
+    ports:
+      - "127.0.0.1:3002:3002"
+    volumes:
+      - ./data:/app/server/data
+      - ./gateway.config.json:/app/gateway.config.json:ro
+    init: true
+    stop_grace_period: 60s
+    restart: unless-stopped
+    healthcheck:
+      # Admin port, inside the container: upstream's full /livez body.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/livez').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    networks: [gateway]
+
+  caddy:
+    image: caddy:2.10-alpine
+    environment:
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN:?set GATEWAY_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      gateway:
+        condition: service_started
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    networks: [gateway]
+
+networks:
+  gateway: {}
+
+volumes:
+  caddy-data: {}
+  caddy-config: {}

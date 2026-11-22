@@ -1,0 +1,110 @@
+# Public edge for the AI gateway. Second layer of defence: the gateway's own
+# gate enforces the same rules (exact paths, app keys, body limits), and is the
+# authority. Caddy keeps junk away from Node: no key, wrong path or oversized
+# body never reaches the gateway process.
+{
+	email {$ACME_EMAIL}
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 120s
+			idle 120s
+			# no write timeout: streamed answers can run for minutes
+		}
+	}
+}
+
+(to_gateway) {
+	reverse_proxy gateway:3001 {
+		# Stream server-sent events as they arrive.
+		flush_interval -1
+		# During a deploy the container restarts: keep retrying the connection
+		# for up to 30 s instead of answering 502.
+		lb_try_duration 30s
+		lb_try_interval 250ms
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 180s
+		}
+	}
+}
+
+{$GATEWAY_DOMAIN} {
+	# App keys are upstream client-profile keys: sk-cp- followed by 48 hex chars.
+	@no_app_key not header_regexp Authorization ^Bearer\s+sk-cp-[0-9a-f]{48}$
+
+	header -Server
+
+	@livez {
+		method GET
+		path /livez
+	}
+	@models {
+		method GET
+		path /v1/models
+	}
+	@chat {
+		method POST
+		path /v1/chat/completions
+	}
+	@embeddings {
+		method POST
+		path /v1/embeddings
+	}
+	@transcriptions {
+		method POST
+		path /v1/audio/transcriptions
+	}
+
+	handle @livez {
+		import to_gateway
+	}
+
+	handle @models {
+		header @no_app_key Content-Type application/json
+		respond @no_app_key `{"error":{"message":"Invalid API key","type":"authentication_error","code":"invalid_api_key"}}` 401
+		import to_gateway
+	}
+
+	handle @chat {
+		header @no_app_key Content-Type application/json
+		respond @no_app_key `{"error":{"message":"Invalid API key","type":"authentication_error","code":"invalid_api_key"}}` 401
+		request_body {
+			max_size 8MB
+		}
+		import to_gateway
+	}
+
+	handle @embeddings {
+		header @no_app_key Content-Type application/json
+		respond @no_app_key `{"error":{"message":"Invalid API key","type":"authentication_error","code":"invalid_api_key"}}` 401
+		request_body {
+			max_size 1MB
+		}
+		import to_gateway
+	}
+
+	handle @transcriptions {
+		header @no_app_key Content-Type application/json
+		respond @no_app_key `{"error":{"message":"Invalid API key","type":"authentication_error","code":"invalid_api_key"}}` 401
+		request_body {
+			max_size 25MB
+		}
+		import to_gateway
+	}
+
+	# Everything else: not here.
+	handle {
+		header Content-Type application/json
+		respond `{"error":{"message":"Not found","type":"not_found_error","code":"not_found"}}` 404
+	}
+
+	log {
+		output stdout
+		# Never log credentials (Caddy already redacts Authorization by default).
+		format filter {
+			request>headers>Authorization delete
+			request>headers>X-Api-Key delete
+		}
+	}
+}

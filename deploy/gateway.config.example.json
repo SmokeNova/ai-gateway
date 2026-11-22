@@ -1,0 +1,17 @@
+{
+  "lanes": {
+    "lane:fast": { "endpoint": "chat", "chain": "gw-fast", "input": ["text", "image"] },
+    "lane:smart": { "endpoint": "chat", "chain": "gw-smart", "input": ["text", "image"] },
+    "lane:audio": { "endpoint": "chat", "chain": "gw-audio", "input": ["text", "audio"] },
+    "lane:stt": { "endpoint": "transcriptions" },
+    "lane:embed-bge-m3": { "endpoint": "embeddings", "family": "bge-m3" }
+  },
+  "apps": {
+    "example-app": {
+      "lanes": ["lane:fast", "lane:smart", "lane:stt"],
+      "max_rpm": 30,
+      "max_rpd": 1000,
+      "max_concurrent": 4
+    }
+  }
+}
