@@ -189,7 +189,7 @@ All our server code lives in `server/src/gateway/`; tests in `server/src/__tests
    Matching is exact (method + lowercase path, no trailing slash), because Express itself is case-insensitive and ignores trailing slashes. `HEAD`, `/V1/...`, `/v1/models/`, `/v1/v1/...` are all 404.
 2. **Body size from `Content-Length`**: over the endpoint's limit → 413. Chunked bodies are bounded by Caddy.
 3. **Key check without a body:** upstream's exported `extractApiToken()` (`Authorization` Bearer, then `x-api-key`, then `x-goog-api-key`), then `resolveAuth(token)`; allow only `kind === 'profile'`, else 401.
-3b. **Strip behaviour-changing request headers:** `X-FreeLLM-Cache`, `Idempotency-Key`, `x-session-id`, `anthropic-version`, and any client `X-Request-ID` (the gate sets its own = the request-log ID). Internal routing headers are removed from public responses.
+3b. **Neutralise behaviour-changing request headers:** strip `X-FreeLLM-Cache`, `Idempotency-Key`, `anthropic-version` and any client `X-Request-ID` (the gate sets its own = the request-log ID); set `Cache-Control: no-store` (turns the response cache off per request, even if enabled in the dashboard); replace `x-session-id` with a fresh random value (reasoning memory is always on upstream, so this keeps every request isolated). Internal routing headers are removed from public responses.
 4. **Endpoint check:** the key's lanes imply endpoints, so a key with no STT lane gets 403 `endpoint_not_allowed` on `/v1/audio/transcriptions`.
 5. **Limits** (all read from `gateway_request_log`, §6.2): concurrency, per-minute, per-day, tokens/day → 429 with `Retry-After`.
 6. **Admit:** insert the request-log row, then continue to upstream.
@@ -380,7 +380,8 @@ ai-gateway/                     (GitHub fork of freellmapi)
 - ✅ [ANALYSIS.md](ANALYSIS.md): route inventory, boot/scheduler inventory, answers to Q1–Q15 (Q7 deferred to M2), and the plan changes they forced (v3.1).
 - Running locally with Docker Compose needs Docker Desktop (not installed); otherwise the first compose run happens on the VM in M2.
 
-### M1: Server mode and gate (3–4 days)
+### M1: Server mode, gate and lane allowlist (~4 days) — detailed plan: [milestones/M1.md](milestones/M1.md)
+- Includes the lane allowlist and rewrite, moved up from M3/M4 because upstream lets any app key call any model, including `fusion`. The migration runner moves to M3.
 - `gateway/server-mode.ts` (startup checks, forced-off features), the gate (exact path matching, header stripping, JSON parse after the key check), path blocks, the outer app + second listener in `index.ts`, empty migration runner, graceful shutdown. First task: confirm the outer-app approach works without editing `app.ts` (ANALYSIS F13).
 - `deploy/docker-compose.yml` and `deploy/Caddyfile` with the §5 network setup (run locally if Docker Desktop is installed).
 - **Tests** (Vitest + supertest, in `server/src/__tests__/gateway/`):
