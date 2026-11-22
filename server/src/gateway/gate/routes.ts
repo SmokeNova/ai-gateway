@@ -79,6 +79,11 @@ export function normalisePath(rawUrl: string): string | null {
 }
 
 export function isBlockedEverywhere(rawUrl: string): boolean {
+  // Only origin-form targets ("/path"). Absolute-form ("http://host/api/update")
+  // and asterisk-form ("*") targets are still routed by Express on their
+  // pathname, so they would slip past the checks below; nothing legitimate
+  // sends them to an origin server.
+  if (!rawUrl.startsWith('/')) return true;
   const p = normalisePath(rawUrl);
   if (p === null) return true;
   if (BLOCKED_EXACT.includes(p)) return true;

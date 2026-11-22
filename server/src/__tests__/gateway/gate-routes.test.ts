@@ -46,6 +46,7 @@ describe('route matching (unit)', () => {
     '/v1/t/sometoken/chat/completions', '/v1/v1/t/x', '/v1beta/models', '/mcp', '/mcp/', '//mcp',
     '/api/tags', '/api/chat', '/api/generate', '/api/embed', '/api/show', '/api/version',
     '/%E0%A4%A',
+    'http://gw.example.com/api/update', 'http://127.0.0.1:3002/api/ping', '*',
   ])('blocks %s everywhere', (url) => {
     expect(isBlockedEverywhere(url)).toBe(true);
   });
@@ -109,6 +110,19 @@ describe('admin port', () => {
       expect((await call(h.adminUrl, 'GET', path)).status).toBe(404);
     },
   );
+});
+
+describe('absolute-form request targets', () => {
+  it('are rejected on the admin port too (Express would route them by pathname)', async () => {
+    const url = new URL(h.adminUrl);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = httpRequest({ host: url.hostname, port: url.port, method: 'GET', path: `http://127.0.0.1:${url.port}/api/ping` },
+        (res) => { res.resume(); resolve(res.statusCode ?? 0); });
+      req.on('error', reject);
+      req.end();
+    });
+    expect(status).toBe(404);
+  });
 });
 
 describe('port role is deny-by-default', () => {
