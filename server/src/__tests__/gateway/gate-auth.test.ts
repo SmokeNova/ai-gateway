@@ -104,6 +104,36 @@ describe('which keys are accepted publicly', () => {
     expect(JSON.stringify(res.body)).toContain('gwtest-missing');
   });
 
+  it('two enabled keys sharing an app name → 403 app_ambiguous (fail closed)', async () => {
+    const first = mintAppKey('embed-app');
+    const second = mintAppKey('embed-app');
+    for (const key of [first, second]) {
+      const res = await call(h.publicUrl, 'GET', '/v1/models', { key });
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('app_ambiguous');
+    }
+  });
+
+  it('a compressed body → 415 (it would inflate past the size check)', async () => {
+    const res = await call(h.publicUrl, 'POST', '/v1/chat/completions', {
+      key: chatKey, body: chat, headers: { 'Content-Encoding': 'gzip' },
+    });
+    expect(res.status).toBe(415);
+    expect(res.body.error.code).toBe('unsupported_encoding');
+  });
+
+  it('a chunked body over the limit → 413 from the parser', async () => {
+    const big = JSON.stringify({ ...chat, pad: 'x'.repeat(9 * 1024 * 1024) });
+    const res = await fetch(`${h.publicUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chatKey}` },
+      // A stream body has no Content-Length, so it goes out chunked.
+      body: new Blob([big]).stream(),
+      duplex: 'half',
+    } as RequestInit);
+    expect(res.status).toBe(413);
+  });
+
   it('an STT-only key cannot use chat', async () => {
     const res = await call(h.publicUrl, 'POST', '/v1/chat/completions', { key: sttKey, body: chat });
     expect(res.status).toBe(403);

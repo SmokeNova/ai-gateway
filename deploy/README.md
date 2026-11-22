@@ -11,7 +11,9 @@ Files for running the gateway on one Linux VM. The VM bootstrap, CI/CD, backups 
 
 Data lives in `/srv/gateway/data` (bind mount → `/app/server/data`, DB file `freeapi.db`).
 
-The gateway process runs as the image's `node` user (uid 1000), so `gateway.config.json` must be readable by it: `chown 1000:1000 gateway.config.json && chmod 600 gateway.config.json`. `.env` is read by Docker itself and can stay `root:root 0600`.
+The gateway process runs as the image's `node` user (uid 1000), so `gateway.config.json` must be readable by it: `chown 1000:1000 gateway.config.json && chmod 600 gateway.config.json`. The image's entrypoint chowns `data/` on every start, but create it first (`mkdir -p data && chown 1000:1000 data`) so the first backup and SQLite files land with the right owner. `.env` is read by Docker itself and can stay `root:root 0600`.
+
+Apps send their key as `Authorization: Bearer sk-cp-…`. Caddy only lets that form through, although the gate itself would also accept `x-api-key`. Caddy's own 413 (body over the limit) is plain text, not JSON.
 
 Not yet validated with real `docker compose` / `caddy validate` runs (no Docker on the dev machine); that happens on the VM in M2.
 

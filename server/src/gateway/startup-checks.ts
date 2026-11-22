@@ -25,10 +25,11 @@ export function serverModeProblems(config: Config, gw: GatewayEnv, env: NodeJS.P
     problems.push('ENCRYPTION_KEY must be a real 64-char hex key (not empty, not a placeholder)');
   }
 
-  const tp = config.trustProxy;
-  const trustsSpecificProxies = (typeof tp === 'number' && tp >= 1) || (Array.isArray(tp) && tp.length > 0);
-  if (!trustsSpecificProxies) {
-    problems.push('TRUST_PROXY must be 1 (one proxy hop) or a list of proxy addresses, never unset or "true"');
+  // Exactly one hop: Caddy. More hops (or a trust list) would let a client's
+  // own X-Forwarded-For entry become req.ip, dodging upstream's per-IP limiter
+  // and polluting analytics.
+  if (config.trustProxy !== 1) {
+    problems.push('TRUST_PROXY must be exactly 1 (Caddy is the only proxy in front)');
   }
 
   if (config.allowedHosts.length === 0 || config.allowedHosts.includes('*')) {

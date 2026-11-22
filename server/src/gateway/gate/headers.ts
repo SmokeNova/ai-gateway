@@ -51,7 +51,7 @@ export function neutraliseRequestHeaders(req: Request): void {
   (req as { rawHeaders: string[] }).rawHeaders = raw;
 }
 
-const INTERNAL_RESPONSE_HEADER = /^x-(routed-via|provider|model|fallback-|freellm-|ratelimit-)/i;
+const INTERNAL_RESPONSE_HEADER = /^x-(routed-via|provider|model|fallback-|freellm-|ratelimit-|powered-by)/i;
 
 export function isInternalResponseHeader(name: string): boolean {
   return INTERNAL_RESPONSE_HEADER.test(name);

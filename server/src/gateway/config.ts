@@ -12,10 +12,30 @@ const positiveInt = z.number().int().positive();
 
 export const INPUT_MODALITIES = ['text', 'image', 'audio'] as const;
 
+/**
+ * Names upstream resolves BEFORE looking up a profile: `auto:<alias>` sorts the
+ * whole catalog instead of using a chain (services/router.ts
+ * GLOBAL_SORT_ALIASES), plus names upstream refuses for profiles
+ * (routes/profiles.ts RESERVED_PROFILE_NAMES). A lane pointing at one of these
+ * would silently route to every enabled model. Kept in sync by
+ * __tests__/gateway/config.test.ts, which reads upstream's source.
+ */
+export const RESERVED_CHAIN_NAMES: readonly string[] = [
+  'auto', 'default', 'active',
+  'smart', 'smartest', 'intelligence',
+  'fast', 'fastest', 'speed',
+  'cheap', 'cheapest', 'price', 'budget',
+  'reliable', 'reliability',
+  'balanced',
+];
+
 const chatLane = z.object({
   endpoint: z.literal('chat'),
   /** Upstream named chain (profile). The request's model becomes `auto:<chain>`. */
-  chain: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,19}$/i, 'chain must be an upstream profile name (max 20 chars)'),
+  chain: z.string()
+    .regex(/^[a-z0-9][a-z0-9_-]{0,19}$/i, 'chain must be an upstream profile name (max 20 chars)')
+    .refine(name => !RESERVED_CHAIN_NAMES.includes(name.toLowerCase()),
+      'chain name is reserved upstream (auto:<name> would route to every model); use e.g. "gw-fast"'),
   /** Input modalities this lane accepts. Enforced in M4. */
   input: z.array(z.enum(INPUT_MODALITIES)).min(1).default(['text']),
 }).strict();

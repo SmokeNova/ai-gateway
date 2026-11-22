@@ -30,8 +30,10 @@
 }
 
 {$GATEWAY_DOMAIN} {
-	# App keys are upstream client-profile keys: sk-cp- followed by 48 hex chars.
-	@no_app_key not header_regexp Authorization ^Bearer\s+sk-cp-[0-9a-f]{48}$
+	# App keys are upstream client-profile keys (sk-cp- + hex). The gate checks the
+	# key itself; this only keeps obviously keyless traffic away from Node. (No
+	# {n} quantifier: braces are Caddyfile placeholders.)
+	@no_app_key not header_regexp Authorization ^Bearer\s+sk-cp-[0-9a-f]+$
 
 	header -Server
 
@@ -70,7 +72,7 @@
 		header @no_app_key Content-Type application/json
 		respond @no_app_key `{"error":{"message":"Invalid API key","type":"authentication_error","code":"invalid_api_key"}}` 401
 		request_body {
-			max_size 8MB
+			max_size 8MiB
 		}
 		import to_gateway
 	}
@@ -79,7 +81,7 @@
 		header @no_app_key Content-Type application/json
 		respond @no_app_key `{"error":{"message":"Invalid API key","type":"authentication_error","code":"invalid_api_key"}}` 401
 		request_body {
-			max_size 1MB
+			max_size 1MiB
 		}
 		import to_gateway
 	}
@@ -88,7 +90,7 @@
 		header @no_app_key Content-Type application/json
 		respond @no_app_key `{"error":{"message":"Invalid API key","type":"authentication_error","code":"invalid_api_key"}}` 401
 		request_body {
-			max_size 25MB
+			max_size 26MiB
 		}
 		import to_gateway
 	}
@@ -103,8 +105,11 @@
 		output stdout
 		# Never log credentials (Caddy already redacts Authorization by default).
 		format filter {
-			request>headers>Authorization delete
-			request>headers>X-Api-Key delete
+			wrap json
+			fields {
+				request>headers>Authorization delete
+				request>headers>X-Api-Key delete
+			}
 		}
 	}
 }

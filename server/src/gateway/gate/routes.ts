@@ -26,7 +26,8 @@ const MB = 1024 * 1024;
 
 export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   { method: 'POST', path: '/v1/chat/completions', endpoint: 'chat', bodyLimitBytes: 8 * MB, json: true },
-  { method: 'POST', path: '/v1/audio/transcriptions', endpoint: 'transcriptions', bodyLimitBytes: 25 * MB, json: false },
+  // 26 MiB: upstream's multer accepts a 25 MiB file, plus multipart overhead.
+  { method: 'POST', path: '/v1/audio/transcriptions', endpoint: 'transcriptions', bodyLimitBytes: 26 * MB, json: false },
   { method: 'POST', path: '/v1/embeddings', endpoint: 'embeddings', bodyLimitBytes: 1 * MB, json: true },
   { method: 'GET', path: '/v1/models', endpoint: 'models', bodyLimitBytes: 0, json: false },
   { method: 'GET', path: '/livez', endpoint: 'livez', bodyLimitBytes: 0, json: false },

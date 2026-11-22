@@ -135,7 +135,12 @@ async function main() {
   tuneKeepAlive(server);
   const servers = [server];
   // GATEWAY: admin listener (no onReady, so schedulers start once) and a longer drain for streams.
-  if (gateway) servers.push(startAdminListener(app, gateway.adminPort, HOST, tuneKeepAlive));
+  if (gateway) {
+    startAdminListener({
+      app, port: gateway.adminPort, host: gateway.adminHost ?? HOST, tune: tuneKeepAlive,
+      register: s => servers.push(s), ipv4Fallback: !process.env.HOST && !gateway.adminHost,
+    });
+  }
   installGracefulShutdown({
     servers: () => servers.filter(s => s.listening),
     closeDb: () => getDb().close?.(),

@@ -6,6 +6,8 @@ export interface GatewayEnv {
   serverMode: boolean;
   /** GATEWAY_ADMIN_PORT: the only port that gets admin (dashboard) access. */
   adminPort: number | null;
+  /** GATEWAY_ADMIN_HOST: bind address for the admin port (default: same as HOST). */
+  adminHost: string | null;
   /** GATEWAY_CONFIG_PATH: lanes and per-app policies (gateway.config.json). */
   configPath: string | null;
 }
@@ -18,6 +20,7 @@ export function readGatewayEnv(env: NodeJS.ProcessEnv = process.env): GatewayEnv
   return {
     serverMode: TRUTHY.test(env.GATEWAY_SERVER_MODE?.trim() ?? ''),
     adminPort: Number.isInteger(port) && port > 0 && port < 65536 ? port : null,
+    adminHost: env.GATEWAY_ADMIN_HOST?.trim() || null,
     configPath: env.GATEWAY_CONFIG_PATH?.trim() || null,
   };
 }

@@ -68,11 +68,23 @@ function handlePublic(
       `Request body exceeds the ${Math.round(route.bodyLimitBytes / (1024 * 1024))} MB limit for ${route.path}`);
   }
 
+  // Compressed request bodies are not supported: they'd be inflated past the
+  // Content-Length check above.
+  const encoding = String(req.headers['content-encoding'] ?? 'identity').trim().toLowerCase();
+  if (route.method === 'POST' && encoding !== 'identity') {
+    return sendGatewayError(res, 415, 'invalid_request_error', 'unsupported_encoding',
+      'Compressed request bodies are not supported (send without Content-Encoding)');
+  }
+
   const auth = authenticateApp(req, config);
   if (!auth.ok) {
     if (auth.reason === 'app_not_configured') {
       return sendGatewayError(res, 403, 'permission_error', 'app_not_configured',
         'This key is valid but has no gateway policy. Add the app to gateway.config.json.');
+    }
+    if (auth.reason === 'app_ambiguous') {
+      return sendGatewayError(res, 403, 'permission_error', 'app_ambiguous',
+        'More than one enabled app key has this name; gateway policies need unique names.');
     }
     return sendGatewayError(res, 401, 'authentication_error', 'invalid_api_key', 'Invalid API key');
   }
@@ -126,9 +138,6 @@ function sendParseError(res: Response, err: unknown): void {
   const e = err as { type?: string; status?: number };
   if (e?.type === 'entity.too.large' || e?.status === 413) {
     return sendGatewayError(res, 413, 'request_too_large', 'body_too_large', 'Request body too large');
-  }
-  if (e?.type === 'encoding.unsupported' || e?.status === 415) {
-    return sendGatewayError(res, 415, 'invalid_request_error', 'unsupported_encoding', 'Unsupported content encoding');
   }
   return sendGatewayError(res, 400, 'invalid_request_error', 'invalid_json', 'Request body is not valid JSON');
 }

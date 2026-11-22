@@ -1,8 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { GatewayConfigError, loadGatewayConfig, parseGatewayConfig } from '../../gateway/config.js';
+import { GatewayConfigError, loadGatewayConfig, parseGatewayConfig, RESERVED_CHAIN_NAMES } from '../../gateway/config.js';
 import { TEST_CONFIG } from './helpers.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'gw-config-'));
@@ -32,6 +33,27 @@ describe('gateway config', () => {
     ['non-positive limit', { lanes: { 'lane:x': { endpoint: 'transcriptions' } }, apps: { a: { lanes: ['lane:x'], max_rpm: 0 } } }],
   ])('rejects %s', (_label, raw) => {
     expect(() => parseGatewayConfig(raw)).toThrow(GatewayConfigError);
+  });
+
+  it.each(['fast', 'Smart', 'cheapest', 'balanced', 'auto', 'default'])(
+    'rejects chain name %s (an upstream alias that routes to every model)', (chain) => {
+      expect(() => parseGatewayConfig({ lanes: { 'lane:x': { endpoint: 'chat', chain } }, apps: {} }))
+        .toThrow(/reserved upstream/);
+    },
+  );
+
+  it('the reserved list covers every alias and reserved name in upstream source', () => {
+    const src = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    const router = readFileSync(join(src, 'services', 'router.ts'), 'utf8');
+    const profiles = readFileSync(join(src, 'routes', 'profiles.ts'), 'utf8');
+    const aliasBlock = router.match(/GLOBAL_SORT_ALIASES[^=]*=\s*\{([\s\S]*?)\};/)?.[1] ?? '';
+    const reservedBlock = profiles.match(/RESERVED_PROFILE_NAMES\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? '';
+    const upstream = [
+      ...[...aliasBlock.matchAll(/([a-z]+)\s*:/g)].map(m => m[1]),
+      ...[...reservedBlock.matchAll(/'([^']+)'/g)].map(m => m[1]),
+    ];
+    expect(upstream.length).toBeGreaterThan(10); // the source scan really found them
+    expect(upstream.filter(n => !RESERVED_CHAIN_NAMES.includes(n))).toEqual([]);
   });
 
   it('loads from a file and reports unreadable or invalid JSON clearly', () => {

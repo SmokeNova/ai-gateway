@@ -1,6 +1,6 @@
 # AI Gateway — Implementation Plan (thin fork of freellmapi)
 
-> **Status:** v3.1. M0 done (fork, baseline, analysis) — findings in [ANALYSIS.md](ANALYSIS.md). Next: M1.
+> **Status:** v3.1. M0 and M1 done — findings in [ANALYSIS.md](ANALYSIS.md), M1 result in [milestones/M1.md](milestones/M1.md). Next: M2 (deploy).
 > **Written:** 2026-11-22 · **Revised:** 2026-11-22 (v3)
 > **Repo:** [`SmokeNova/ai-gateway`](https://github.com/SmokeNova/ai-gateway), a GitHub fork of [`tashfeenahmed/freellmapi`](https://github.com/tashfeenahmed/freellmapi) (MIT, TypeScript: Express 5 + SQLite + React/Vite dashboard). Based on upstream release **v0.16.38** (2026-11-21).
 > **Background:** [research/AI_GATEWAY_RESEARCH_REPORT.md](research/AI_GATEWAY_RESEARCH_REPORT.md), [research/ARCHITECTURE_AND_PROVIDERS_DEEP_DIVE.md](research/ARCHITECTURE_AND_PROVIDERS_DEEP_DIVE.md). The earlier build-from-scratch plan is kept as [research/FROM_SCRATCH_PLAN.md](research/FROM_SCRATCH_PLAN.md) (deferred "Option C").
@@ -214,7 +214,7 @@ All our server code lives in `server/src/gateway/`; tests in `server/src/__tests
 - `GATEWAY_ADMIN_PORT` ≠ `PORT`
 - forced-off features really are off
 
-**Upstream settings we set:** `PROXY_RATE_LIMIT_RPM=600` (per-app limits are the real control; app egress IPs on Render/Vercel are shared), `FALLBACK_TIME_BUDGET_MS=55000` (§6.4), `HEALTH_CHECK_INTERVAL_MS=900000` (fewer key probes), `FREELLMAPI_UPDATE_CHECK=off`, `FREEAPI_DB_BACKUP_INTERVAL_MS=21600000`.
+**Upstream settings we set:** `PROXY_RATE_LIMIT_RPM=600` (per-app limits are the real control; app egress IPs on Render/Vercel are shared), `FALLBACK_TIME_BUDGET_MS=55000` (§6.4), `HEALTH_CHECK_INTERVAL_MS=900000` (fewer key probes), `FREEAPI_DB_BACKUP_INTERVAL_MS=21600000`.
 
 **Password reset:** the one-time code goes to the server log, readable only by me (SSH/Tailscale).
 

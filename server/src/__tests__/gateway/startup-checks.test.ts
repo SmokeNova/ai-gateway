@@ -47,6 +47,8 @@ describe('server-mode startup checks', () => {
     ['not production', {}, { nodeEnv: 'development' }, 'NODE_ENV'],
     ['trust proxy off', {}, { trustProxy: false }, 'TRUST_PROXY'],
     ['trust every proxy', {}, { trustProxy: true }, 'TRUST_PROXY'],
+    ['trust two hops', {}, { trustProxy: 2 }, 'TRUST_PROXY'],
+    ['trust a catch-all list', {}, { trustProxy: ['0.0.0.0/0'] }, 'TRUST_PROXY'],
     ['no allowed hosts', {}, { allowedHosts: [] }, 'ALLOWED_HOSTS'],
     ['wildcard allowed hosts', {}, { allowedHosts: ['*'] }, 'ALLOWED_HOSTS'],
   ] as const)('rejects %s', (_label, env, config, expected) => {

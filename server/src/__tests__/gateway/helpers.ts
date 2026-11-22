@@ -48,7 +48,7 @@ export async function startGatewayHarness(rawConfig: unknown = TEST_CONFIG): Pro
   const adminServer = createServer();
   const publicPort = await listenEphemeral(publicServer);
   const adminPort = await listenEphemeral(adminServer);
-  const app = createGatewayApp(loadConfig(), { adminPort, config });
+  const app = createGatewayApp(loadConfig(), { adminPort, adminHost: null, config });
   publicServer.on('request', app);
   adminServer.on('request', app);
 
