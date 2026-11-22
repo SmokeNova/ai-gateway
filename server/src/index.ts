@@ -23,6 +23,9 @@ import { installLogRedaction } from './lib/log-redaction.js';
 import { cleanupExpiredCooldowns } from './services/ratelimit.js';
 import { loadCacheFromDb } from './services/cache.js';
 import { installGracefulShutdown } from './lib/graceful-shutdown.js';
+// GATEWAY: server mode (docs/gateway/UPSTREAM_TOUCHPOINTS.md)
+import { createGatewayApp, loadGatewayRuntime } from './gateway/app.js';
+import { startAdminListener } from './gateway/server.js';
 
 // Before any other statement runs, so no provider key can reach stdout — users
 // paste server output into bug reports. Module scope, not inside main(), so it
@@ -32,6 +35,8 @@ installLogRedaction();
 async function main() {
   const config = loadConfig();
   const { port: PORT, host: HOST } = config;
+  // GATEWAY: null when GATEWAY_SERVER_MODE is off; throws (stopping the boot) on unsafe settings.
+  const gateway = loadGatewayRuntime(config);
   warnOnEnvDrift();
 
   // Install first so a late provider socket reset (undici HTTP/2 error with no
@@ -76,7 +81,8 @@ async function main() {
   // Must happen after initDb so the settings table is ready.
   restoreProxySettings();
 
-  const app = createApp(config);
+  // GATEWAY: in server mode the gateway gate wraps upstream's app.
+  const app = gateway ? createGatewayApp(config, gateway) : createApp(config);
 
   const onReady = (host: string) => () => {
     const display = host.includes(':') ? `[${host}]` : host;
@@ -128,7 +134,13 @@ async function main() {
   const server = app.listen(Number(PORT), HOST, onReady(HOST));
   tuneKeepAlive(server);
   const servers = [server];
-  installGracefulShutdown({ servers: () => servers.filter(s => s.listening), closeDb: () => getDb().close?.() });
+  // GATEWAY: admin listener (no onReady, so schedulers start once) and a longer drain for streams.
+  if (gateway) servers.push(startAdminListener(app, gateway.adminPort, HOST, tuneKeepAlive));
+  installGracefulShutdown({
+    servers: () => servers.filter(s => s.listening),
+    closeDb: () => getDb().close?.(),
+    ...(gateway ? { graceMs: 50_000 } : {}),
+  });
   server.on('error', (err: NodeJS.ErrnoException) => {
     // The default '::' bind fails where IPv6 is disabled (kernel
     // ipv6.disable=1 and the like) — retry IPv4-only rather than dying.
