@@ -15,9 +15,9 @@
 | `npm ci` | ✅ | 3 m 40 s |
 | `npm run build` (server, cli, client) | ✅ | — |
 | `npm run lint` | ✅ | — |
-| `npm test` (full, serial) | BASELINE_TEST_RESULT | BASELINE_TEST_TIME |
+| `npm test` (full, serial) | Hooks and bootstrap tests ✅; **server: 5,573 passed, 17 failed, 9 skipped** (428 files; 420 passed, 8 failed). `npm test` stops at the first failing workspace, so the cli and client suites did not run locally | 11 m 50 s (server suite 660 s) |
 
-Environment: Windows 11, Node 24.19 (upstream allows `>=20.18 <25`; `.nvmrc` says 22; the Docker image uses Node 24). BASELINE_TEST_NOTE
+Environment: Windows 11, Node 24.19 (upstream allows `>=20.18 <25`; `.nvmrc` says 22; the Docker image uses Node 24). **The 17 failures are Windows-environment issues, not real breakage:** upstream CI on the same commit (`d05c6c33`) passes "Test & build" on Node 20, 22 and 24 (Linux). The failing tests hit `*.localhost` DNS resolution, the Windows registry proxy lookup ("unable to find the specified registry key"), an undici "bad port" error, and 5 s timeouts in the timing-heavy `router-bandit` tests. Files: `lib/proxy`, `services/router-bandit`, `routes/proxy-cache`, `routes/keys-desktop-reauth`, `routes/settings-headroom`, `routes/fallback-keycount-parity`, `routes/proxy-rate-limit`, `routes/analytics-client`. **Authoritative baseline = Linux CI** (upstream `ci.yml`, kept enabled in our fork). Locally, the useful check is "same 17 failures before and after our change".
 
 ---
 
